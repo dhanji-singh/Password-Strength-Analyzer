@@ -18,8 +18,6 @@ typedef struct {
 // Global CSS provider
 GtkCssProvider *css_provider = NULL;
 
-// ...existing code...
-
 void on_password_changed(GtkEditable *editable, gpointer user_data) {
     AppWidgets *widgets = (AppWidgets *)user_data;
     const char *pwd = gtk_entry_get_text(GTK_ENTRY(widgets->password_entry));
@@ -47,21 +45,13 @@ void on_password_changed(GtkEditable *editable, gpointer user_data) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(widgets->strength_bar), 
         (double)(strength + 1) / 3.0);
 
-    // Set color for progress bar (only load CSS once)
-    if (strength == 0 && css_provider) {
-        gtk_css_provider_load_from_data(css_provider, 
-            "progressbar { min-height: 20px; } progressbar trough { background-color: #ffebee; } progressbar progress { background-color: #d32f2f; }",
-            -1, NULL);
-    }
-
     // Update feedback
     gtk_label_set_text(GTK_LABEL(widgets->feedback_label), getFeedback(strength, len));
 }
 
-// ...existing code...
-
 static void activate(GtkApplication *app, gpointer user_data) {
-    AppWidgets widgets;
+    // Allocate memory for widgets structure (FIXED: was using stack variable)
+    AppWidgets *widgets = g_malloc(sizeof(AppWidgets));
     
     // Create main window
     GtkWidget *window = gtk_application_window_new(app);
@@ -77,12 +67,56 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_margin_end(main_box, 20);
     gtk_window_set_child(GTK_WINDOW(window), main_box);
 
-    // Initialize CSS provider
+    // Initialize CSS provider (FIXED: moved to initialization, not in callback)
     css_provider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(css_provider, 
+        "progressbar { min-height: 20px; } "
+        "progressbar trough { background-color: #ffebee; } "
+        "progressbar progress { background-color: #d32f2f; }",
+        -1, NULL);
+    
     GtkStyleContext *context = gtk_widget_get_style_context(main_box);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(css_provider), 
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-    // ...existing code (title through feedback_label)...
+    // Create title label
+    GtkWidget *title_label = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(title_label), 
+        "<span font_size='18000' weight='bold'>Password Strength Analyzer</span>");
+    gtk_box_append(GTK_BOX(main_box), title_label);
+
+    // Create password entry label
+    GtkWidget *entry_label = gtk_label_new("Enter Password:");
+    gtk_widget_set_halign(entry_label, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(main_box), entry_label);
+
+    // Create password entry
+    widgets->password_entry = gtk_entry_new();
+    gtk_entry_set_visibility(GTK_ENTRY(widgets->password_entry), FALSE);
+    gtk_entry_set_placeholder_text(GTK_ENTRY(widgets->password_entry), "Type your password...");
+    gtk_box_append(GTK_BOX(main_box), widgets->password_entry);
+
+    // Create result label
+    widgets->result_label = gtk_label_new("");
+    gtk_box_append(GTK_BOX(main_box), widgets->result_label);
+
+    // Create strength bar
+    widgets->strength_bar = gtk_progress_bar_new();
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(widgets->strength_bar), 0.0);
+    gtk_box_append(GTK_BOX(main_box), widgets->strength_bar);
+
+    // Create feedback label
+    widgets->feedback_label = gtk_label_new("Enter a password to analyze");
+    gtk_widget_set_wrap_mode(widgets->feedback_label, GTK_WRAP_WORD);
+    gtk_box_append(GTK_BOX(main_box), widgets->feedback_label);
+
+    // Connect signal handler (FIXED: now passes heap-allocated widgets)
+    g_signal_connect(widgets->password_entry, "changed", 
+        G_CALLBACK(on_password_changed), widgets);
+
+    // Connect cleanup handler
+    g_signal_connect(window, "destroy", 
+        G_CALLBACK(g_free), widgets);
 
     // Show all widgets
     gtk_widget_show(window);
