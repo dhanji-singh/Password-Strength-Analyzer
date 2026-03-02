@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+             "includePath": [
+    "${workspaceFolder}/**"
+],
+            "defines": [
+                "VERSION=4"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "windowsSdkVersion": "10.0.17134.0"
+        }
+    ],
+    "version": 4
+}
